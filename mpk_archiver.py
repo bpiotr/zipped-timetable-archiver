@@ -37,10 +37,10 @@ def main():
             files_extracted = extract_new_file(temp_file_path, args.local_git_path)
             print(files_extracted)
 
-            # local_repo.index.add(files_extracted)
-            # commit = local_repo.index.commit("Nowy rozkład")
+            local_repo.index.add(files_extracted)
+            commit = local_repo.index.commit("Nowy rozkład")
 
-            new_log_entry = UpdateLogEntry(datetime.datetime.utcnow(), new_checksum, "8f9077845bcc1192ebc359dca4f51b9b5096ef1b")
+            new_log_entry = UpdateLogEntry(datetime.datetime.utcnow(), new_checksum, commit.hexsha)
             print(new_log_entry)
 
             insert_log_entry_in_table(args.local_git_path, new_log_entry)
