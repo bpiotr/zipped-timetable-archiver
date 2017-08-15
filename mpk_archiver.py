@@ -36,17 +36,18 @@ def main():
         if not latest_log_entry or new_checksum != latest_log_entry.checksum:
             files_extracted = extract_new_file(temp_file_path, args.local_git_path)
             print(files_extracted)
+            utcnow = datetime.datetime.utcnow()
 
             local_repo.index.add(files_extracted)
-            commit = local_repo.index.commit("Nowy rozkład")
+            commit = local_repo.index.commit("Nowy rozkład: {}".format(utcnow))
 
-            new_log_entry = UpdateLogEntry(datetime.datetime.utcnow(), new_checksum, commit.hexsha)
+            new_log_entry = UpdateLogEntry(utcnow, new_checksum, commit.hexsha)
             print(new_log_entry)
 
             insert_log_entry_in_table(args.local_git_path, new_log_entry)
 
             local_repo.index.add([os.path.join(args.local_git_path, "README.md")])
-            local_repo.index.commit("Nowy wpis w logu")
+            local_repo.index.commit("Nowy wpis w logu {}".format(utcnow))
 
             # push
             local_repo.remote().push()
