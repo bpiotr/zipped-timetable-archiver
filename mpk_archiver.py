@@ -1,6 +1,9 @@
 import datetime
 import hashlib
-import urllib.request as request
+try:
+    import urllib.request as request
+except ImportError:
+    import urllib as request
 from argparse import ArgumentParser
 import zipfile
 
