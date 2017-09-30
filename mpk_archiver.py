@@ -16,46 +16,63 @@ UpdateLogEntry = namedtuple("UpdateLogEntry", ["registered", "checksum", "commit
 
 
 def main():
+    local_git_path, remote_git_url, timetable_url = _parse_cli_args()
+
+    print("Updating local repository at {} from {}.".format(local_git_path, remote_git_url))
+    local_repo = update_local_git_repo(local_git_path, remote_git_url)
+    print("Done.")
+
+    print("Looking for newest log entry...")
+    latest_log_entry = get_newest_log_entry(local_git_path)
+    print("Done: '{}'.".format(latest_log_entry))
+
+    try:
+        print("Downloading {}...".format(timetable_url))
+        temp_file_path = download_file(timetable_url)
+        print("Done: {}.".format(temp_file_path))
+
+        print("Calculating checksum of the downloaded file...")
+        new_checksum = calculate_checksum(temp_file_path)
+        print("Done: '{}'.".format(new_checksum))
+
+        if not latest_log_entry or new_checksum != latest_log_entry.checksum:
+            print("NEW TIMETABLE DETECTED. Checksum of the downloaded data is different than the newest log entry.")
+            print("Extracting downloaded archive...")
+            files_extracted = extract_new_file(temp_file_path, local_git_path)
+            print("Done: {}".format(files_extracted))
+
+            current_utc_time = datetime.datetime.utcnow()
+            local_repo.index.add(files_extracted)
+            print("Committing extracted files...")
+            new_files_commit = local_repo.index.commit("Nowy rozkład: {}".format(current_utc_time))
+            print("Done: {}.".format(new_files_commit))
+
+            print("Inserting and committing new log entry...")
+            new_log_entry = UpdateLogEntry(current_utc_time, new_checksum, new_files_commit.hexsha)
+            insert_log_entry_in_table(local_git_path, new_log_entry)
+            local_repo.index.add([os.path.join(local_git_path, "README.md")])
+            log_modification_commit = local_repo.index.commit("Nowy wpis w logu {}".format(current_utc_time))
+            print("Done: {}.".format(log_modification_commit))
+
+            print("Pushing changes to {}...".format(remote_git_url))
+            local_repo.remote().push()
+            print("Done")
+        else:
+            print("No new timetable detected. Checksum of the downloaded data is the same as the newest log entry.")
+    finally:
+        cleanup()
+
+
+def _parse_cli_args():
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-g", "--local_git_path", help="Path to the local git repo.")
     arg_parser.add_argument("-url", "--remote_git_url", help="URL to remote git repo.")
     arg_parser.add_argument("download_url", help="URL to file to be downloaded, unzipped and placed in the repo.")
-
     args = arg_parser.parse_args()
-
-    local_repo = update_local_git_repo(args.local_git_path, args.remote_git_url)
-    print(local_repo)
-
-    latest_log_entry = get_newest_log_entry(args.local_git_path)
-    print(latest_log_entry)
-
-    try:
-        temp_file_path = download_file(args.download_url)
-        print(temp_file_path)
-
-        new_checksum = calculate_checksum(temp_file_path)
-        print(new_checksum)
-
-        if not latest_log_entry or new_checksum != latest_log_entry.checksum:
-            files_extracted = extract_new_file(temp_file_path, args.local_git_path)
-            print(files_extracted)
-            utcnow = datetime.datetime.utcnow()
-
-            local_repo.index.add(files_extracted)
-            commit = local_repo.index.commit("Nowy rozkład: {}".format(utcnow))
-
-            new_log_entry = UpdateLogEntry(utcnow, new_checksum, commit.hexsha)
-            print(new_log_entry)
-
-            insert_log_entry_in_table(args.local_git_path, new_log_entry)
-
-            local_repo.index.add([os.path.join(args.local_git_path, "README.md")])
-            local_repo.index.commit("Nowy wpis w logu {}".format(utcnow))
-
-            # push
-            local_repo.remote().push()
-    finally:
-        cleanup()
+    local_git_path = args.local_git_path
+    remote_git_url = args.remote_git_url
+    timetable_url = args.download_url
+    return local_git_path, remote_git_url, timetable_url
 
 
 def download_file(download_url):
@@ -141,12 +158,8 @@ def update_local_git_repo(local_repo_path, remote_repo_url=None):
     else:
         local_repo = Repo(local_repo_path)
 
-    # if local_repo.is_dirty():
-    #     raise Exception("Local repo is dirty. Clean it up.")
-
     origin = local_repo.remote()
     origin.pull()
-
     return local_repo
 
 
