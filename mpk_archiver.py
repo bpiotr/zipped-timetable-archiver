@@ -76,9 +76,10 @@ def _read_ssh_key_from_env_and_save():
     ssh_key = os.getenv("ARCHIVER_SSH_KEY")
     if not ssh_key:
         raise Exception("'ARCHIVER_SSH_KEY' env variable must be specified!")
-    with open(KEY_PATH, "w") as f:
-        f.write(ssh_key)
-    print(ssh_key[:150])
+    if not os._exists(KEY_PATH):
+        with open(KEY_PATH, "w") as f:
+            f.write(ssh_key)
+        print(ssh_key[:150])
     os.chmod(KEY_PATH, 0o400)
 
 
