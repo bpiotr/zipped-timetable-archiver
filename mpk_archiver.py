@@ -96,8 +96,9 @@ def download_file(download_url):
 
 
 def cleanup(temp_file):
-    os.chmod(temp_file, 0o500)
-    os.remove(temp_file)
+    if temp_file and os._exists(temp_file):
+        os.chmod(temp_file, 0o500)
+        os.remove(temp_file)
     request.urlcleanup()
 
 
