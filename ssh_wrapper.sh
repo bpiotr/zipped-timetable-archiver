@@ -2,4 +2,4 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-ssh -i $DIR/ssh_key
+exec /usr/bin/ssh -o StrictHostKeyChecking=no -i "$DIR/ssh_key" "$@"
