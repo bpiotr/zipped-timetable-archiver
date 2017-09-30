@@ -26,7 +26,7 @@ def main():
         ssh_key = os.getenv("ssh_key")
         if not ssh_key:
             raise Exception("'ssh_key' env variable must be specified!")
-        key_file, key_path = tempfile.mkstemp(dir="/opt/app-root/src")
+        key_file, key_path = tempfile.mkstemp(dir="/opt/app-root")
         with open(key_file) as f:
             f.write(ssh_key)
         os.chmod(key_path, 0o400)
