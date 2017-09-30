@@ -79,7 +79,6 @@ def _read_ssh_key_from_env_and_save():
     if not os.path.exists(KEY_PATH):
         with open(KEY_PATH, "w") as f:
             f.write(ssh_key)
-        print(ssh_key[:150])
     os.chmod(KEY_PATH, 0o400)
 
 
@@ -181,8 +180,8 @@ def update_local_git_repo(local_repo_path, remote_repo_url=None):
         local_repo = Repo.clone_from(remote_repo_url, local_repo_path, env=env)
     else:
         local_repo = Repo(local_repo_path)
-        local_repo.git.update_environment(**env)
 
+    local_repo.git.update_environment(**env)
     origin = local_repo.remote()
     origin.pull()
     return local_repo
