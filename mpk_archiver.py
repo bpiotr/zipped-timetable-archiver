@@ -1,5 +1,7 @@
 import datetime
 import hashlib
+import tempfile
+
 try:
     import urllib.request as request
 except ImportError:
@@ -18,15 +20,25 @@ UpdateLogEntry = namedtuple("UpdateLogEntry", ["registered", "checksum", "commit
 def main():
     local_git_path, remote_git_url, timetable_url = _parse_cli_args()
 
-    print("Updating local repository at {} from {}.".format(local_git_path, remote_git_url))
-    local_repo = update_local_git_repo(local_git_path, remote_git_url)
-    print("Done.")
-
-    print("Looking for newest log entry...")
-    latest_log_entry = get_newest_log_entry(local_git_path)
-    print("Done: '{}'.".format(latest_log_entry))
+    key_path = None
 
     try:
+        ssh_key = os.getenv("ssh_key")
+        if not ssh_key:
+            raise Exception("'ssh_key' env variable must be specified!")
+        key_file, key_path = tempfile.mkstemp()
+        with open(key_file) as f:
+            f.write(ssh_key)
+        os.chmod(key_path, 0o400)
+
+        print("Updating local repository at {} from {}.".format(local_git_path, remote_git_url))
+        local_repo = update_local_git_repo(local_git_path, key_path, remote_git_url)
+        print("Done.")
+
+        print("Looking for newest log entry...")
+        latest_log_entry = get_newest_log_entry(local_git_path)
+        print("Done: '{}'.".format(latest_log_entry))
+
         print("Downloading {}...".format(timetable_url))
         temp_file_path = download_file(timetable_url)
         print("Done: {}.".format(temp_file_path))
@@ -60,7 +72,7 @@ def main():
         else:
             print("No new timetable detected. Checksum of the downloaded data is the same as the newest log entry.")
     finally:
-        cleanup()
+        cleanup(key_path)
 
 
 def _parse_cli_args():
@@ -80,8 +92,11 @@ def download_file(download_url):
     return path
 
 
-def cleanup():
+def cleanup(temp_file):
+    os.chmod(temp_file, 0o500)
+    os.remove(temp_file)
     request.urlcleanup()
+
 
 
 def calculate_checksum(file_path):
@@ -150,13 +165,15 @@ def _get_all_logfile_contents(local_git_path):
     return log_file_content
 
 
-def update_local_git_repo(local_repo_path, remote_repo_url=None):
+def update_local_git_repo(local_repo_path, key_path, remote_repo_url=None):
+    env = {"GIT_SSH": "ssh -i {}".format(key_path)}
     if not os.path.exists(local_repo_path):
         if not remote_repo_url:
             raise Exception("You must pass remote GIT URL if the local repo does not exist.")
-        local_repo = Repo.clone_from(remote_repo_url, local_repo_path)
+        local_repo = Repo.clone_from(remote_repo_url, local_repo_path, env=env)
     else:
         local_repo = Repo(local_repo_path)
+        local_repo.git.update_environment(**env)
 
     origin = local_repo.remote()
     origin.pull()
