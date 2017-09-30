@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 
+
 try:
     import urllib.request as request
 except ImportError:
@@ -14,9 +15,11 @@ from dateutil.parser import parse as parse_date_string
 from git import Repo
 
 UpdateLogEntry = namedtuple("UpdateLogEntry", ["registered", "checksum", "commit"])
+
 SCRIPT_PATH = os.path.realpath(__file__)
-KEY_PATH = os.path.join(SCRIPT_PATH, "ssh_key")
-SSH_WRAPPER_PATH = os.path.join(SCRIPT_PATH, "ssh_wrapper.sh")
+SCRIPT_DIR = os.path.dirname(SCRIPT_PATH)
+KEY_PATH = os.path.join(SCRIPT_DIR, "ssh_key")
+SSH_WRAPPER_PATH = os.path.join(SCRIPT_DIR, "ssh_wrapper.sh")
 
 
 def main():
