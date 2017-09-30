@@ -76,7 +76,7 @@ def _read_ssh_key_from_env_and_save():
     ssh_key = os.getenv("ARCHIVER_SSH_KEY")
     if not ssh_key:
         raise Exception("'ARCHIVER_SSH_KEY' env variable must be specified!")
-    if not os._exists(KEY_PATH):
+    if not os.path.exists(KEY_PATH):
         with open(KEY_PATH, "w") as f:
             f.write(ssh_key)
         print(ssh_key[:150])
@@ -101,7 +101,7 @@ def download_file(download_url):
 
 
 def cleanup(temp_file):
-    if temp_file and os._exists(temp_file):
+    if temp_file and os.path.exists(temp_file):
         os.chmod(temp_file, 0o500)
         os.remove(temp_file)
     request.urlcleanup()
