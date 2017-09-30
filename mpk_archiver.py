@@ -165,7 +165,7 @@ def _get_all_logfile_contents(local_git_path):
 
 
 def update_local_git_repo(local_repo_path, key_path, remote_repo_url=None):
-    env = {"GIT_SSH": "ssh -i {}".format(key_path)}
+    env = {"GIT_SSH": "/usr/bin/ssh -i {}".format(key_path)}
     if not os.path.exists(local_repo_path):
         if not remote_repo_url:
             raise Exception("You must pass remote GIT URL if the local repo does not exist.")
