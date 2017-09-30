@@ -1,6 +1,5 @@
 import datetime
 import hashlib
-import tempfile
 
 try:
     import urllib.request as request
@@ -15,24 +14,19 @@ from dateutil.parser import parse as parse_date_string
 from git import Repo
 
 UpdateLogEntry = namedtuple("UpdateLogEntry", ["registered", "checksum", "commit"])
+SCRIPT_PATH = os.path.realpath(__file__)
+KEY_PATH = os.path.join(SCRIPT_PATH, "ssh_key")
+SSH_WRAPPER_PATH = os.path.join(SCRIPT_PATH, "ssh_wrapper.sh")
 
 
 def main():
     local_git_path, remote_git_url, timetable_url = _parse_cli_args()
 
-    key_path = None
-
     try:
-        ssh_key = os.getenv("ssh_key")
-        if not ssh_key:
-            raise Exception("'ssh_key' env variable must be specified!")
-        key_file, key_path = tempfile.mkstemp(dir="/opt/app-root")
-        with open(key_file, "w") as f:
-            f.write(ssh_key)
-        os.chmod(key_path, 0o400)
+        _read_ssh_key_from_env_and_save()
 
         print("Updating local repository at {} from {}.".format(local_git_path, remote_git_url))
-        local_repo = update_local_git_repo(local_git_path, key_path, remote_git_url)
+        local_repo = update_local_git_repo(local_git_path, remote_git_url)
         print("Done.")
 
         print("Looking for newest log entry...")
@@ -72,7 +66,16 @@ def main():
         else:
             print("No new timetable detected. Checksum of the downloaded data is the same as the newest log entry.")
     finally:
-        cleanup(key_path)
+        cleanup(KEY_PATH)
+
+
+def _read_ssh_key_from_env_and_save():
+    ssh_key = os.getenv("ARCHIVER_SSH_KEY")
+    if not ssh_key:
+        raise Exception("'ARCHIVER_SSH_KEY' env variable must be specified!")
+    with open(KEY_PATH, "w") as f:
+        f.write(ssh_key)
+    os.chmod(KEY_PATH, 0o400)
 
 
 def _parse_cli_args():
@@ -164,8 +167,8 @@ def _get_all_logfile_contents(local_git_path):
     return log_file_content
 
 
-def update_local_git_repo(local_repo_path, key_path, remote_repo_url=None):
-    env = {"GIT_SSH": "/usr/bin/ssh -i {}".format(key_path)}
+def update_local_git_repo(local_repo_path, remote_repo_url=None):
+    env = {"GIT_SSH": SSH_WRAPPER_PATH}
     if not os.path.exists(local_repo_path):
         if not remote_repo_url:
             raise Exception("You must pass remote GIT URL if the local repo does not exist.")
