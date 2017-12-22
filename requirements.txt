@@ -1,2 +1,4 @@
 python-dateutil
 GitPython
+bs4
+requests
