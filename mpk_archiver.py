@@ -5,6 +5,7 @@ import requests
 import tempfile
 import sched, time
 import logging
+import pathlib
 
 
 def configure_logging():
@@ -80,6 +81,10 @@ def main(local_git_path, remote_git_url, timetable_url):
 
         current_utc_time = datetime.datetime.utcnow()
         local_repo.index.add(files_extracted)
+
+        for now_missing_file in pathlib.Path(local_git_dir).rglob("*.txt").filter(lambda p: str(p) not in files_extracted):
+            local_repo.index.remove(str(now_missing_file))
+
         logger.info("Committing extracted files...")
         new_files_commit = local_repo.index.commit("Nowy rozkład: {}".format(current_utc_time))
         logger.info("Done: %s.", new_files_commit)
@@ -207,6 +212,7 @@ def update_local_git_repo(local_repo_path, remote_repo_url=None):
     if not os.path.exists(os.path.join(local_repo_path, ".git")):
         if not remote_repo_url:
             raise Exception("You must pass remote GIT URL if the local repo does not exist.")
+        logger.info("Cloning repo from %s to %s ...", remote_git_url, local_repo_path)
         local_repo = Repo.clone_from(remote_repo_url, local_repo_path, env=env)
     else:
         local_repo = Repo(local_repo_path)
@@ -228,6 +234,9 @@ if __name__ == '__main__':
         s.setup(delay, main, (local_git_dir.name, remote_git_url, timetable_url))
         s.run()
     finally:
+        logger.info("Cleaning %s", KEY_PATH)
         cleanup(KEY_PATH)
+        logger.info("Cleaning %s", local_git_dir.name)
         local_git_dir.cleanup()
+        logger.info("Done.")
 
