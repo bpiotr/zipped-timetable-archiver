@@ -109,6 +109,9 @@ def _read_ssh_key_from_env_and_save():
         logger.info("'ARCHIVER_SSH_KEY; is not specified. Using user's default SSH config.")
         return
     logger.info("Saving $ARCHIVER_SSH_KEY to {}".format(KEY_PATH))
+
+    if os.path.exists(KEY_PATH):
+        os.chmod(KEY_PATH, 0o700)
     with open(KEY_PATH, "w") as f:
         f.write(ssh_key)
     os.chmod(KEY_PATH, 0o400)
