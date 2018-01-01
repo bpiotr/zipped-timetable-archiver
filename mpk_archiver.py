@@ -1,11 +1,12 @@
 import datetime
 import hashlib
-import bs4
-import requests
-import tempfile
-import sched, time
 import logging
 import pathlib
+import sched
+import tempfile
+import time
+
+import ckanapi
 
 
 def configure_logging():
@@ -48,15 +49,17 @@ class PeriodicScheduler(object):
         self.scheduler = sched.scheduler(time.time, time.sleep)
 
     def setup(self, interval, action, actionargs=()):
-        action(*actionargs)
-        self.scheduler.enter(interval, 1, self.setup,
-                             (interval, action, actionargs))
+        try:
+            action(*actionargs)
+        finally:
+            self.scheduler.enter(interval, 1, self.setup,
+                                 (interval, action, actionargs))
 
     def run(self):
         self.scheduler.run()
 
 
-def main(local_git_path, remote_git_url, timetable_url):
+def main(local_git_path, ckan_url, package_name):
     logger.info("Updating local repository at %s from %s.", local_git_path, remote_git_url)
     local_repo = update_local_git_repo(local_git_path, remote_git_url)
     logger.info("Done.")
@@ -65,9 +68,15 @@ def main(local_git_path, remote_git_url, timetable_url):
     latest_log_entry = get_newest_log_entry(local_git_path)
     logger.info("Done: '%s'.", latest_log_entry)
 
+    logger.info("Getting package url from CKAN...")
+    ckan = ckanapi.RemoteCKAN(ckan_url)
+    package_info = ckan.call_action('package_show', {"id": package_name})
+    logger.info("Done: %s", package_info)
+
+    timetable_url = package_info['resources'][0]['url']
     logger.info("Downloading %s...", timetable_url)
-    temp_file_path = download_file(timetable_url)
-    logger.info("Done: %s.", temp_file_path)
+    temp_file_path, http_message = request.urlretrieve(timetable_url)
+    logger.info("Done: %s, HTTP message: %s.", temp_file_path, http_message)
 
     logger.info("Calculating checksum of the downloaded file...")
     new_checksum = calculate_checksum(temp_file_path)
@@ -110,31 +119,24 @@ def _read_ssh_key_from_env_and_save():
         return
     logger.info("Saving $ARCHIVER_SSH_KEY to {}".format(KEY_PATH))
 
-    if os.path.exists(KEY_PATH):
-        os.chmod(KEY_PATH, 0o700)
-    with open(KEY_PATH, "w") as f:
-        f.write(ssh_key)
-    os.chmod(KEY_PATH, 0o400)
+    try:
+        if os.path.exists(KEY_PATH):
+            os.chmod(KEY_PATH, 0o600)
+        with open(KEY_PATH, "w") as f:
+            f.write(ssh_key)
+    finally:
+        os.chmod(KEY_PATH, 0o400)
 
 
 def _parse_cli_args():
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-url", "--remote_git_url", help="URL to remote git repo.")
     arg_parser.add_argument("-d", "--delay", help="Interval of waiting between checks.", type=int)
-    arg_parser.add_argument("download_url", help="URL to download page.")
+    arg_parser.add_argument("ckan_url", help="URL to CKAN API.")
+    arg_parser.add_argument("package_name", help="Name of the package in CKAN")
 
     args = arg_parser.parse_args()
-    return args.remote_git_url, args.download_url, args.delay
-
-
-def download_file(download_url):
-    page = requests.get(download_url)
-    if (page.status_code != 200):
-        page.raise_for_status()
-    mpk_data_tree = bs4.BeautifulSoup(page.text, "html.parser")
-    link = mpk_data_tree.find("a", {"class": "resource-url-analytics"})
-    path, http_message = request.urlretrieve(link.get("href"))
-    return path
+    return args.remote_git_url, args.ckan_url, args.package_name, args.delay
 
 
 def cleanup(temp_file):
@@ -229,12 +231,12 @@ def update_local_git_repo(local_repo_path, remote_repo_url=None):
 if __name__ == '__main__':
     _read_ssh_key_from_env_and_save()
 
-    remote_git_url, timetable_url, delay = _parse_cli_args()
+    remote_git_url, ckan_url, package_name, delay = _parse_cli_args()
     local_git_dir = tempfile.TemporaryDirectory("_mpk")
 
     try:
         s = PeriodicScheduler()
-        s.setup(delay, main, (local_git_dir.name, remote_git_url, timetable_url))
+        s.setup(delay, main, (local_git_dir.name, remote_git_url, ckan_url, package_name))
         s.run()
     finally:
         logger.info("Cleaning %s", KEY_PATH)
