@@ -59,7 +59,7 @@ class PeriodicScheduler(object):
         self.scheduler.run()
 
 
-def main(local_git_path, ckan_url, package_name):
+def main(local_git_path, remote_git_url, ckan_url, package_name):
     logger.info("Updating local repository at %s from %s.", local_git_path, remote_git_url)
     local_repo = update_local_git_repo(local_git_path, remote_git_url)
     logger.info("Done.")
